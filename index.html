@@ -1,0 +1,1095 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Enteral Nutrient Calculator</title>
+<meta name="description" content="Calculate the daily enteral nutrient intake of preterm infants on human milk, fortifier and supplements, and compare it with ESPGHAN recommendations.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
+<style>
+/* Layout: a two-pane bedside worksheet. Prescription inputs on the left (yellow boxes, as in the
+   original sheet), live results on the right; stacks to one column on phones. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --surface-2: #eceff3;
+  --ink: #16202a;
+  --ink-2: #47535f;
+  --ink-3: #6f7b88;
+  --line: #d9dfe5;
+  --input-bg: #fff8dc;
+  --input-line: #e2c25f;
+  --input-unit: #fbefc4;
+  --warn: #8a5a00;
+  --focus: #1d5fa8;
+  --below: #1a64a6;
+  --below-bg: #e2eefa;
+  --within: #1f7a45;
+  --within-bg: #def2e5;
+  --above: #b8352a;
+  --above-bg: #fbe5e2;
+  --track: #e4e8ec;
+  --band: #b9e0c8;
+  --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e141a; --surface: #151d25; --surface-2: #1d2731; --ink: #e4e9ee; --ink-2: #aab5c0;
+    --ink-3: #7f8b97; --line: #29343f; --input-bg: #272113; --input-line: #6f5c25; --input-unit: #30291a;
+    --warn: #e9b65a; --focus: #6ea9ea; --below: #73b4ee; --below-bg: #142a3e; --within: #67d095;
+    --within-bg: #133222; --above: #f2867a; --above-bg: #3b1b18; --track: #26313b; --band: #24533a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e141a; --surface: #151d25; --surface-2: #1d2731; --ink: #e4e9ee; --ink-2: #aab5c0;
+  --ink-3: #7f8b97; --line: #29343f; --input-bg: #272113; --input-line: #6f5c25; --input-unit: #30291a;
+  --warn: #e9b65a; --focus: #6ea9ea; --below: #73b4ee; --below-bg: #142a3e; --within: #67d095;
+  --within-bg: #133222; --above: #f2867a; --above-bg: #3b1b18; --track: #26313b; --band: #24533a;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 var(--font-body);
+}
+a { color: var(--focus); }
+.wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* Masthead */
+.masthead { background: var(--surface); border-bottom: 1px solid var(--line); }
+.masthead .wrap { padding-block: 26px 22px; }
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+h1 {
+  margin: 0;
+  font-family: var(--font-display); font-weight: 600;
+  font-size: clamp(26px, 4vw, 36px); line-height: 1.1; letter-spacing: -.01em;
+  text-wrap: balance;
+}
+.lede { margin: 8px 0 0; max-width: 62ch; color: var(--ink-2); }
+
+/* Two panes */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  padding-block: 24px 40px;
+}
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+
+/* Inputs */
+.inputs { padding: 20px; }
+fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+fieldset + fieldset { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+legend {
+  float: left; width: 100%; padding: 0; margin-bottom: 12px;
+  font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3);
+}
+.fields { display: grid; gap: 14px; clear: both; }
+.fields.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.fields.two .span2 { grid-column: 1 / -1; }
+.field label { display: block; margin-bottom: 5px; font-size: 14px; font-weight: 500; }
+.field label .req { color: var(--ink-3); font-weight: 400; }
+.control {
+  display: flex; align-items: stretch;
+  background: var(--input-bg); border: 1px solid var(--input-line); border-radius: 7px; overflow: hidden;
+}
+.control:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; }
+.control input {
+  flex: 1; min-width: 0; width: 100%;
+  padding: 9px 10px; border: 0; background: transparent; color: var(--ink);
+  font: 500 16px/1.25 var(--font-data);
+}
+.control input:focus { outline: none; }
+.control input[type="date"] { font-family: var(--font-body); }
+.control.text input { font-family: var(--font-body); font-weight: 400; }
+.unit {
+  display: flex; align-items: center; padding: 0 10px; white-space: nowrap;
+  background: var(--input-unit); border-left: 1px solid var(--input-line);
+  font-size: 13px; color: var(--ink-2);
+}
+.hint { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.msg { margin: 4px 0 0; font-size: 12.5px; font-weight: 500; }
+.msg:empty { display: none; }
+.field.is-error .control { border-color: var(--above); }
+.field.is-error .msg { color: var(--above); }
+.field.is-warn .msg { color: var(--warn); }
+.feed-summary {
+  margin: 0; padding: 10px 12px; border-radius: 7px; background: var(--surface-2);
+  font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums;
+}
+.feed-summary strong { color: var(--ink); font-family: var(--font-data); font-weight: 600; }
+.form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+
+/* Buttons */
+.btn {
+  appearance: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 38px; padding: 8px 14px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); cursor: pointer;
+  font: 600 14px/1 var(--font-body);
+}
+.btn:hover { background: var(--surface-2); }
+.btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.btn-primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.btn-primary:hover { background: var(--ink-2); border-color: var(--ink-2); }
+.btn-quiet { border-color: transparent; background: transparent; color: var(--ink-2); }
+.btn-quiet.confirming { color: var(--above); border-color: var(--above); }
+
+/* Results */
+.results { display: grid; gap: 16px; min-width: 0; }
+.results-head {
+  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 20px;
+  padding: 18px 20px 14px;
+}
+h2 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1.2; }
+.sub { margin: 2px 0 0; font-size: 13px; color: var(--ink-3); }
+.seg {
+  display: inline-flex; padding: 3px; gap: 2px; border-radius: 8px;
+  background: var(--surface-2); border: 1px solid var(--line);
+}
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.seg label {
+  padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+  font-size: 13px; font-weight: 600; color: var(--ink-2);
+}
+.seg input:checked + label { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .14); }
+.seg input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 1px; }
+.toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px;
+  padding: 12px 20px; border-top: 1px solid var(--line); background: var(--surface-2);
+}
+.tally { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
+  background: var(--surface); color: var(--ink-2); border: 1px solid var(--line);
+}
+.chip.below, .pill.below { background: var(--below-bg); color: var(--below); border-color: transparent; }
+.chip.within, .pill.within { background: var(--within-bg); color: var(--within); border-color: transparent; }
+.chip.above, .pill.above { background: var(--above-bg); color: var(--above); border-color: transparent; }
+.export { display: flex; flex-wrap: wrap; gap: 8px; }
+.notice { margin: 0; padding: 14px 20px; border-top: 1px solid var(--line); color: var(--ink-2); font-size: 14px; }
+.notice:empty { display: none; }
+.group-title {
+  margin: 0; padding: 14px 20px 4px; border-top: 1px solid var(--line);
+  font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3);
+}
+.rows { list-style: none; margin: 0; padding: 0; }
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 14rem);
+  grid-template-areas: "name value status" "bar bar bar" "note note note";
+  align-items: center; column-gap: 16px; row-gap: 6px;
+  padding: 12px 20px 14px;
+}
+.row + .row { border-top: 1px dashed var(--line); }
+.r-name { grid-area: name; min-width: 0; }
+.r-label { display: block; font-weight: 600; }
+.r-unit { display: block; font-size: 12.5px; color: var(--ink-3); }
+.r-value {
+  grid-area: value; text-align: right;
+  font: 600 24px/1.1 var(--font-data); font-variant-numeric: tabular-nums;
+}
+.r-value small { display: block; margin-top: 2px; font: 400 12px/1.2 var(--font-body); color: var(--ink-3); }
+.row.below .r-value { color: var(--below); }
+.row.within .r-value { color: var(--within); }
+.row.above .r-value { color: var(--above); }
+.r-status { grid-area: status; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.pill {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; background: var(--surface-2); color: var(--ink-3);
+}
+.r-gap { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.r-bar { grid-area: bar; padding-bottom: 14px; position: relative; }
+.track { position: relative; height: 8px; border-radius: 4px; background: var(--track); }
+.band { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--band); }
+.mark {
+  position: absolute; top: -4px; width: 4px; height: 16px; margin-left: -2px; border-radius: 2px;
+  background: var(--ink); box-shadow: 0 0 0 2px var(--surface);
+}
+.row.below .mark { background: var(--below); }
+.row.within .mark { background: var(--within); }
+.row.above .mark { background: var(--above); }
+.scale { position: absolute; left: 0; right: 0; top: 11px; height: 14px; }
+.scale span {
+  position: absolute; transform: translateX(-50%);
+  font: 11px/1 var(--font-data); color: var(--ink-3); white-space: nowrap;
+}
+.scale span.lo { transform: translateX(-100%); padding-right: 3px; }
+.scale span.hi { transform: none; padding-left: 3px; }
+.r-note { grid-area: note; margin: 0; font-size: 12.5px; color: var(--ink-3); }
+.r-note:empty { display: none; }
+@media (max-width: 560px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "name value" "status status" "bar bar" "note note";
+  }
+  .r-status { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+}
+.legend {
+  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+  padding: 12px 20px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2);
+}
+.legend .chip { font-size: 12px; }
+
+/* Collapsible tables */
+details.panel > summary {
+  cursor: pointer; padding: 14px 20px; list-style: none;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font-family: var(--font-display); font-weight: 600; font-size: 18px;
+}
+details.panel > summary::-webkit-details-marker { display: none; }
+details.panel > summary::after { content: "+"; font: 400 20px/1 var(--font-data); color: var(--ink-3); }
+details.panel[open] > summary::after { content: "\2212"; }
+details.panel > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; border-radius: 10px; }
+.details-body { padding: 0 20px 18px; }
+.details-body > p { margin: 0 0 10px; font-size: 13px; color: var(--ink-2); max-width: 70ch; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th, td { padding: 8px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+th:first-child, td:first-child { text-align: left; }
+thead th { background: var(--surface-2); font-size: 12px; font-weight: 600; color: var(--ink-2); }
+tbody tr:last-child td { border-bottom: 0; }
+td { font-family: var(--font-data); font-size: 13px; }
+td:first-child { font-family: var(--font-body); font-size: 13.5px; }
+td:first-child small { display: block; color: var(--ink-3); font-size: 11.5px; }
+td.zero { color: var(--ink-3); }
+td.total { font-weight: 600; }
+td.total.below { color: var(--below); background: var(--below-bg); }
+td.total.within { color: var(--within); background: var(--within-bg); }
+td.total.above { color: var(--above); background: var(--above-bg); }
+
+/* Notes */
+.notes { padding: 18px 20px; font-size: 13.5px; color: var(--ink-2); }
+.notes h2 { font-size: 18px; color: var(--ink); margin-bottom: 8px; }
+.notes ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; max-width: 75ch; }
+.notes p { margin: 12px 0 0; max-width: 75ch; }
+
+.site-foot { padding-block: 0 32px; font-size: 12.5px; color: var(--ink-3); }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  max-width: min(92vw, 480px); padding: 10px 16px; border-radius: 8px;
+  background: var(--ink); color: var(--surface); font-size: 14px; box-shadow: 0 6px 20px rgba(0, 0, 0, .25);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mark { transition: left .25s ease; }
+  .band { transition: left .25s ease, width .25s ease; }
+}
+
+/* Print: one clean light page, controls hidden */
+@media print {
+  :root, :root[data-theme="dark"] {
+    --bg: #fff; --surface: #fff; --surface-2: #f1f3f5; --ink: #000; --ink-2: #333; --ink-3: #555; --line: #bbb;
+    --input-bg: #fff; --input-line: #999; --input-unit: #f1f3f5; --track: #e4e8ec; --band: #b9e0c8;
+    --below: #1a64a6; --below-bg: #e2eefa; --within: #1f7a45; --within-bg: #def2e5; --above: #b8352a; --above-bg: #fbe5e2;
+    color-scheme: light;
+  }
+  @page { size: A4; margin: 10mm; }
+  body { font-size: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .wrap { padding-left: 0; padding-right: 0; max-width: none; }
+  .masthead { border: 0; }
+  .masthead .wrap { padding-block: 0 6px; }
+  h1 { font-size: 20px; }
+  .lede, .hint, .msg, .form-actions, .export, .seg, .notice, .legend, .r-note, #comp-panel, .notes ul,
+  .site-foot, .toast, details.panel > summary::after { display: none !important; }
+  .layout { grid-template-columns: 34% minmax(0, 1fr); gap: 8px; padding-block: 6px 0; }
+  .panel { border-color: #bbb; border-radius: 6px; }
+  .inputs { padding: 10px; }
+  fieldset + fieldset { margin-top: 8px; padding-top: 6px; }
+  legend { margin-bottom: 4px; font-size: 9px; }
+  .fields { gap: 5px; }
+  .field label { margin-bottom: 1px; font-size: 10px; }
+  .control input { padding: 3px 6px; font-size: 11px; }
+  .unit { font-size: 9px; padding: 0 6px; }
+  .feed-summary { padding: 5px 7px; font-size: 9.5px; }
+  .results { gap: 8px; }
+  .results-head { padding: 8px 12px 6px; }
+  h2 { font-size: 15px; }
+  .toolbar { padding: 5px 12px; }
+  .group-title { padding: 6px 12px 0; font-size: 9px; }
+  .row { padding: 4px 12px 6px; row-gap: 2px; break-inside: avoid; }
+  .r-value { font-size: 15px; }
+  .r-unit, .r-gap, .pill { font-size: 9.5px; }
+  details.panel > summary { padding: 6px 12px; font-size: 13px; }
+  .details-body { padding: 0 12px 8px; }
+  .details-body > p { display: none; }
+  th, td { padding: 3px 5px; font-size: 9px; }
+  .table-wrap { overflow: visible; }
+  #contrib-table th:last-child, #contrib-table td:last-child { display: none; }
+  .notes { padding: 8px 12px; font-size: 9px; }
+  .notes h2 { display: none; }
+  .notes p { margin: 3px 0 0; }
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <p class="eyebrow">Neonatal nutrition &middot; Preterm infants</p>
+    <h1>Enteral Nutrient Calculator</h1>
+    <p class="lede">Enter the infant's weight, milk volume and the day's supplements in the yellow boxes. Totals update as you type and are checked against ESPGHAN recommendations.</p>
+  </div>
+</header>
+
+<noscript><p class="wrap">This calculator needs JavaScript. Please enable it in your browser.</p></noscript>
+
+<main class="wrap layout">
+  <form id="calc" class="panel inputs" autocomplete="off" novalidate>
+    <fieldset>
+      <legend>Patient</legend>
+      <div class="fields two">
+        <div class="field span2">
+          <label for="mother">Mother's name</label>
+          <div class="control text"><input id="mother" name="mother" type="text" maxlength="80"></div>
+        </div>
+        <div class="field">
+          <label for="cr">Baby CR number</label>
+          <div class="control text"><input id="cr" name="cr" type="text" maxlength="40"></div>
+        </div>
+        <div class="field">
+          <label for="date">Date</label>
+          <div class="control text"><input id="date" name="date" type="date"></div>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Weight and milk</legend>
+      <div class="fields">
+        <div class="field" data-key="weight">
+          <label for="weight">Weight <span class="req">(required)</span></label>
+          <div class="control"><input id="weight" name="weight" type="text" inputmode="decimal" aria-describedby="weight-msg"><span class="unit">kg</span></div>
+          <p class="msg" id="weight-msg" aria-live="polite"></p>
+        </div>
+        <div class="field" data-key="hmVol">
+          <label for="hmVol">Human milk volume <span class="req">(required)</span></label>
+          <div class="control"><input id="hmVol" name="hmVol" type="text" inputmode="decimal" aria-describedby="hmVol-hint hmVol-msg"><span class="unit">ml/kg/day</span></div>
+          <p class="hint" id="hmVol-hint"></p>
+          <p class="msg" id="hmVol-msg" aria-live="polite"></p>
+        </div>
+        <p class="feed-summary" id="feed-summary">Feed volumes appear here once weight and milk volume are entered.</p>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Fortifier and supplements, total per day</legend>
+      <div class="fields">
+        <div class="field" data-key="hmf">
+          <label for="hmf">Human milk fortifier (HMF)</label>
+          <div class="control"><input id="hmf" name="hmf" type="text" inputmode="decimal" aria-describedby="hmf-hint hmf-msg"><span class="unit">g/day</span></div>
+          <p class="hint" id="hmf-hint"></p>
+          <p class="msg" id="hmf-msg" aria-live="polite"></p>
+        </div>
+        <div class="field" data-key="mct">
+          <label for="mct">MCT oil</label>
+          <div class="control"><input id="mct" name="mct" type="text" inputmode="decimal" aria-describedby="mct-hint mct-msg"><span class="unit">ml/day</span></div>
+          <p class="hint" id="mct-hint"></p>
+          <p class="msg" id="mct-msg" aria-live="polite"></p>
+        </div>
+        <div class="field" data-key="mvi">
+          <label for="mvi">Multivitamin drops (MVI)</label>
+          <div class="control"><input id="mvi" name="mvi" type="text" inputmode="decimal" aria-describedby="mvi-hint mvi-msg"><span class="unit">ml/day</span></div>
+          <p class="hint" id="mvi-hint"></p>
+          <p class="msg" id="mvi-msg" aria-live="polite"></p>
+        </div>
+        <div class="field" data-key="vitd">
+          <label for="vitd">Vitamin D drops</label>
+          <div class="control"><input id="vitd" name="vitd" type="text" inputmode="decimal" aria-describedby="vitd-hint vitd-msg"><span class="unit">ml/day</span></div>
+          <p class="hint" id="vitd-hint"></p>
+          <p class="msg" id="vitd-msg" aria-live="polite"></p>
+        </div>
+        <div class="field" data-key="iron">
+          <label for="iron">Iron drops</label>
+          <div class="control"><input id="iron" name="iron" type="text" inputmode="decimal" aria-describedby="iron-hint iron-msg"><span class="unit">drops/day</span></div>
+          <p class="hint" id="iron-hint"></p>
+          <p class="msg" id="iron-msg" aria-live="polite"></p>
+        </div>
+        <div class="field" data-key="calph">
+          <label for="calph">Calcium-phosphorus syrup</label>
+          <div class="control"><input id="calph" name="calph" type="text" inputmode="decimal" aria-describedby="calph-hint calph-msg"><span class="unit">ml/day</span></div>
+          <p class="hint" id="calph-hint"></p>
+          <p class="msg" id="calph-msg" aria-live="polite"></p>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="form-actions">
+      <button type="button" class="btn" id="btn-example">Load example</button>
+      <button type="button" class="btn btn-quiet" id="btn-clear">Clear all</button>
+    </div>
+  </form>
+
+  <section class="results" aria-labelledby="results-title">
+    <div class="panel">
+      <div class="results-head">
+        <div>
+          <h2 id="results-title">Daily intake</h2>
+          <p class="sub" id="std-line"></p>
+        </div>
+        <div class="seg" role="radiogroup" aria-label="Recommendations to compare with">
+          <input type="radio" name="std" id="std-2022" value="espghan2022" checked><label for="std-2022">ESPGHAN 2022</label>
+          <input type="radio" name="std" id="std-2010" value="espghan2010"><label for="std-2010">ESPGHAN 2010</label>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="tally" id="tally" aria-live="polite"></div>
+        <div class="export">
+          <button type="button" class="btn btn-primary" id="btn-pdf" disabled>Download PDF</button>
+          <button type="button" class="btn" id="btn-print" disabled>Print</button>
+        </div>
+      </div>
+      <p class="notice" id="notice"></p>
+      <h3 class="group-title">Fluid, energy and protein</h3>
+      <ul class="rows" id="rows-macro"></ul>
+      <h3 class="group-title">Minerals and vitamins</h3>
+      <ul class="rows" id="rows-micro"></ul>
+      <div class="legend">
+        <span class="chip below">&#9660; Below</span><span>less than the recommended range</span>
+        <span class="chip within">&#10003; Within</span><span>inside the range</span>
+        <span class="chip above">&#9650; Above</span><span>more than the range</span>
+      </div>
+    </div>
+
+    <details class="panel" id="contrib-panel" open>
+      <summary>Contribution by source</summary>
+      <div class="details-body">
+        <p>How much each feed or supplement adds to the daily total, in the same units as the results above.</p>
+        <div class="table-wrap"><table id="contrib-table"></table></div>
+      </div>
+    </details>
+
+    <details class="panel" id="comp-panel">
+      <summary>Composition values used</summary>
+      <div class="details-body">
+        <p>Nutrient content assumed for each product, taken from the unit's calculation sheet. If your unit changes brand of fortifier or supplement, these values need updating.</p>
+        <div class="table-wrap"><table id="comp-table"></table></div>
+      </div>
+    </details>
+
+    <section class="panel notes" aria-labelledby="notes-title">
+      <h2 id="notes-title">How this is calculated</h2>
+      <ul>
+        <li>Human milk is entered per kg per day. Fortifier and supplements are entered as the <strong>total amount per day</strong>, not per kg.</li>
+        <li>Each product's daily amount is multiplied by its composition. Results are divided by weight to give per kg per day.</li>
+        <li>Fluid includes human milk and the supplements measured in ml. The protein:energy ratio is grams of protein per 100 kcal.</li>
+        <li>ESPGHAN 2022 gives vitamin D per kg per day (400&ndash;700 IU/kg/day) with a ceiling of 1000 IU/day. ESPGHAN 2010 gave it per day (800&ndash;1000 IU/day).</li>
+        <li>Conversions: vitamin D 1 &micro;g = 40 IU; vitamin A 1 IU = 0.3 &micro;g retinol.</li>
+        <li>Status is judged on the rounded value shown on screen.</li>
+      </ul>
+      <p>
+        References:
+        <a href="https://doi.org/10.1097/MPG.0000000000003642" target="_blank" rel="noopener">Embleton ND, et al. Enteral nutrition in preterm infants (2022): a position paper from the ESPGHAN Committee on Nutrition. JPGN 2023;76:248&ndash;68</a>;
+        <a href="https://journals.lww.com/jpgn/Fulltext/2010/01000/Enteral_Nutrient_Supply_for_Preterm_Infants_.21.aspx" target="_blank" rel="noopener">Agostoni C, et al. Enteral nutrient supply for preterm infants. JPGN 2010;50:85&ndash;91</a>.
+      </p>
+      <p>This is a calculation aid for trained clinicians. Check the figures and your unit's protocol before prescribing. Everything runs in your browser: names and CR numbers are not stored or sent anywhere.</p>
+    </section>
+  </section>
+</main>
+
+<footer class="wrap site-foot">
+  <p>Enteral Nutrient Calculator. Adapted from the unit's enteral nutrient calculation sheet.</p>
+</footer>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" integrity="sha384-fCAW/rDWORTbQXSiB7mOg0QtQ5c+r0f544y6XoKjuVva0nMBlCpNUjiFeG5iMdS3" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ------------------------------------------------------------------
+   * Configuration. Edit these values if the unit changes products or
+   * when recommendations are revised.
+   * ------------------------------------------------------------------ */
+
+  // Products, in the order they appear on the sheet. `per` is the unit the composition is given in.
+  var SOURCES = [
+    { key: 'hm',    short: 'HM',     label: 'Human milk (mature)',       per: '100 ml', show: ['energy', 'protein'] },
+    { key: 'hmf',   short: 'HMF',    label: 'Human milk fortifier',      per: 'g',      show: ['energy', 'protein', 'calcium'] },
+    { key: 'mct',   short: 'MCT',    label: 'MCT oil',                   per: 'ml',     show: ['energy'] },
+    { key: 'mvi',   short: 'MVI',    label: 'Multivitamin drops',        per: 'ml',     show: ['vitd', 'vita', 'zinc'] },
+    { key: 'vitd',  short: 'Vit D',  label: 'Vitamin D drops',           per: 'ml',     show: ['vitd'] },
+    { key: 'iron',  short: 'Iron',   label: 'Iron drops',                per: 'drop',   show: ['iron'] },
+    { key: 'calph', short: 'Cal-Ph', label: 'Calcium-phosphorus syrup',  per: 'ml',     show: ['calcium', 'vitd'] }
+  ];
+
+  // Composition of each product (from the unit's sheet). `amount` is the unit of the nutrient itself.
+  var NUTRIENTS = [
+    { key: 'energy',  label: 'Energy',    amount: 'kcal',  noun: 'kcal',      dp: 0, comp: { hm: 67,   hmf: 3.37,  mct: 7.8 } },
+    { key: 'protein', label: 'Protein',   amount: 'g',     noun: 'protein',   dp: 2, comp: { hm: 1.1,  hmf: 0.27 } },
+    { key: 'iron',    label: 'Iron',      amount: 'mg',    noun: 'iron',      dp: 2, comp: { hm: 0.03, hmf: 0.3,   iron: 1 } },
+    { key: 'vitd',    label: 'Vitamin D', amount: 'IU',    noun: 'vitamin D', dp: 0, comp: { hm: 2,    hmf: 132.8, mvi: 200, vitd: 400, calph: 40 } },
+    { key: 'vita',    label: 'Vitamin A', amount: 'µg RE', noun: 'vitamin A', dp: 0, comp: { hm: 40, hmf: 60, mvi: 1500 } },
+    { key: 'zinc',    label: 'Zinc',      amount: 'mg',    noun: 'zinc',      dp: 2, comp: { hm: 0.3,  hmf: 0.04,  mvi: 2 } },
+    { key: 'calcium', label: 'Calcium',   amount: 'mg',    noun: 'calcium',   dp: 0, comp: { hm: 25,   hmf: 15.8,  calph: 16.4 } }
+  ];
+
+  // Recommended ranges. All per kg per day unless `basis: 'day'`.
+  var STANDARDS = {
+    espghan2022: {
+      label: 'ESPGHAN 2022',
+      cite: 'Embleton ND, et al. JPGN 2023;76:248-68',
+      targets: {
+        fluid:   { low: 150, high: 180,  note: '135–200 ml/kg/day may be appropriate in individual infants.' },
+        energy:  { low: 115, high: 140,  note: 'Up to 160 kcal/kg/day if growth is below target, once protein and other nutrients are sufficient.' },
+        protein: { low: 3.5, high: 4.0,  note: 'May be increased up to 4.5 g/kg/day where growth is slow.' },
+        per:     { low: 2.8, high: 3.6,  note: 'Applies once energy and protein are both within range.' },
+        iron:    { low: 2,   high: 3,    note: 'From 2 weeks of age. Up to 6 mg/kg/day with erythropoietin; avoid prolonged intake above 3.' },
+        vitd:    { low: 400, high: 700,  maxPerDay: 1000, note: 'Maximum 1000 IU/day in total.' },
+        vita:    { low: 400, high: 1000 },
+        zinc:    { low: 2,   high: 3 },
+        calcium: { low: 120, high: 200,  note: 'Equal to 3.0–5.0 mmol/kg/day.' }
+      }
+    },
+    espghan2010: {
+      label: 'ESPGHAN 2010',
+      cite: 'Agostoni C, et al. JPGN 2010;50:85-91',
+      targets: {
+        fluid:   { low: 135, high: 200 },
+        energy:  { low: 110, high: 135 },
+        protein: { low: 3.5, high: 4.5 },
+        per:     null,
+        iron:    { low: 2,   high: 3 },
+        vitd:    { low: 800, high: 1000, basis: 'day' },
+        vita:    { low: 400, high: 1000 },
+        zinc:    { low: 1.1, high: 2 },
+        calcium: { low: 120, high: 140 }
+      }
+    }
+  };
+
+  // Values from the original sheet, for the "Load example" button.
+  var EXAMPLE = { weight: '1.254', hmVol: '150', hmf: '', mct: '', mvi: '', vitd: '1', iron: '', calph: '4.5' };
+
+  var INPUT_KEYS = ['weight', 'hmVol', 'hmf', 'mct', 'mvi', 'vitd', 'iron', 'calph'];
+  var SUPPLEMENTS = ['hmf', 'mct', 'mvi', 'vitd', 'iron', 'calph'];
+
+  /* ------------------------------------------------------------------ */
+
+  var $ = function (id) { return document.getElementById(id); };
+  var NUT = {};
+  NUTRIENTS.forEach(function (n) { NUT[n.key] = n; });
+  var lastResult = null;
+
+  function fmt(x, dp) {
+    if (x === null || x === undefined || !isFinite(x)) return '—';
+    return Number(x).toFixed(dp);
+  }
+  // Trim trailing zeros from user-entered numbers ("1.250" -> "1.25").
+  function plain(x) { return String(Number(x)); }
+  function rangeText(lo, hi, dp) { return fmt(lo, dp) + '–' + fmt(hi, dp); }
+
+  function todayISO() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function dateLabel(iso) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return '';
+    var p = iso.split('-');
+    return new Date(+p[0], +p[1] - 1, +p[2]).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  function compText(source) {
+    return source.show.map(function (k) {
+      var n = NUT[k];
+      var v = n.comp[source.key] || 0;
+      return n.key === 'energy' ? v + ' kcal' : v + ' ' + n.amount + ' ' + n.noun;
+    }).join(', ');
+  }
+
+  /* ---------- Reading and checking inputs ---------- */
+
+  function readNumber(id) {
+    var raw = $(id).value.trim().replace(',', '.');
+    if (raw === '') return { empty: true, value: 0 };
+    if (!/^(\d+\.?\d*|\.\d+)$/.test(raw)) return { error: 'Enter a number, e.g. 1.5' };
+    return { value: parseFloat(raw) };
+  }
+
+  function setFieldState(key, kind, message) {
+    var field = document.querySelector('.field[data-key="' + key + '"]');
+    field.classList.toggle('is-error', kind === 'error');
+    field.classList.toggle('is-warn', kind === 'warn');
+    $(key + '-msg').textContent = message || '';
+  }
+
+  function readInputs() {
+    var v = {}, ok = true, missing = [];
+    INPUT_KEYS.forEach(function (key) {
+      var r = readNumber(key);
+      var kind = null, msg = '';
+      if (r.error) { kind = 'error'; msg = r.error; ok = false; }
+      else if (key === 'weight') {
+        if (r.empty) { missing.push('weight'); ok = false; }
+        else if (r.value === 0) { kind = 'error'; msg = 'Weight must be more than 0.'; ok = false; }
+        else if (r.value >= 100) { kind = 'error'; msg = 'This looks like grams. Enter weight in kg, e.g. 1.254.'; ok = false; }
+        else if (r.value > 10) { kind = 'error'; msg = 'Check the weight. Enter it in kg.'; ok = false; }
+        else if (r.value < 0.3) { kind = 'warn'; msg = 'Below 0.3 kg. Check the weight is in kg.'; }
+      } else if (key === 'hmVol') {
+        if (r.empty) { missing.push('milk volume'); ok = false; }
+        else if (r.value > 250) { kind = 'warn'; msg = 'Above 250 ml/kg/day. Check the volume is per kg.'; }
+      } else if (key === 'iron' && r.value > 20) {
+        kind = 'warn'; msg = 'More than 20 drops a day. Check the dose.';
+      }
+      setFieldState(key, kind, msg);
+      v[key] = r.value || 0;
+    });
+    return { values: v, ok: ok, missing: missing };
+  }
+
+  /* ---------- Calculation ---------- */
+
+  function assess(value, dp, t, weight) {
+    if (!t) return { status: 'info', low: null, high: null, comment: 'No target in this edition' };
+    var low = t.low, high = t.high, capped = false;
+    // A daily ceiling (vitamin D) lowers the per-kg upper limit for heavier infants.
+    // When it applies, "above" is decided on the daily total by the caller.
+    if (t.maxPerDay && t.maxPerDay / weight < high) {
+      high = t.maxPerDay / weight;
+      capped = true;
+      low = Math.min(low, high);
+    }
+    var shown = Number(value.toFixed(dp));
+    var status, comment;
+    if (shown < low) { status = 'below'; comment = fmt(low - shown, dp) + ' short of ' + fmt(low, dp); }
+    else if (shown > high && !capped) { status = 'above'; comment = fmt(shown - high, dp) + ' over ' + fmt(high, dp); }
+    else { status = 'within'; comment = 'Within ' + rangeText(low, high, dp); }
+    return { status: status, low: low, high: high, capped: capped, comment: comment };
+  }
+
+  function calculate(v, stdKey) {
+    var std = STANDARDS[stdKey], T = std.targets, w = v.weight;
+    // Daily quantity of each product. Human milk is counted in units of 100 ml per day.
+    var qty = { hm: w * v.hmVol / 100, hmf: v.hmf, mct: v.mct, mvi: v.mvi, vitd: v.vitd, iron: v.iron, calph: v.calph };
+
+    var daily = {}, parts = {};
+    NUTRIENTS.forEach(function (n) {
+      parts[n.key] = {};
+      var total = 0;
+      SOURCES.forEach(function (s) {
+        var a = (n.comp[s.key] || 0) * qty[s.key];
+        parts[n.key][s.key] = a;
+        total += a;
+      });
+      daily[n.key] = total;
+    });
+
+    function nutrientRow(key) {
+      var n = NUT[key], t = T[key];
+      var perDay = t && t.basis === 'day';
+      var div = perDay ? 1 : w;
+      var value = daily[key] / div;
+      var row = {
+        key: key, label: n.label, dp: n.dp, value: value, target: t,
+        unit: n.amount + (perDay ? '/day' : '/kg/day'),
+        parts: {}
+      };
+      SOURCES.forEach(function (s) { row.parts[s.key] = parts[key][s.key] / div; });
+      if (key === 'vitd' && !perDay) row.extra = fmt(daily.vitd, 0) + ' IU/day in total';
+      if (key === 'vitd' && t && t.maxPerDay) row.dailyTotal = daily.vitd;
+      return row;
+    }
+
+    var fluid = v.hmVol + (v.mct + v.mvi + v.vitd + v.calph) / w;
+    var energyKg = daily.energy / w, proteinKg = daily.protein / w;
+    var macro = [
+      { key: 'fluid', label: 'Fluid', unit: 'ml/kg/day', dp: 0, value: fluid, target: T.fluid },
+      nutrientRow('energy'),
+      nutrientRow('protein'),
+      { key: 'per', label: 'Protein : energy ratio', unit: 'g protein per 100 kcal', dp: 2,
+        value: energyKg > 0 ? proteinKg / energyKg * 100 : 0, target: T.per }
+    ];
+    var micro = ['iron', 'vitd', 'vita', 'zinc', 'calcium'].map(nutrientRow);
+
+    macro.concat(micro).forEach(function (r) {
+      var a = assess(r.value, r.dp, r.target, w);
+      r.status = a.status; r.low = a.low; r.high = a.high; r.comment = a.comment; r.capped = a.capped;
+      // Vitamin D (2022) also has a ceiling on the total daily dose.
+      var max = r.target && r.target.maxPerDay;
+      if (max && Number(r.dailyTotal.toFixed(0)) > max) {
+        r.status = 'above';
+        r.comment = fmt(r.dailyTotal - max, 0) + ' IU/day over the ' + max + ' IU/day maximum';
+      }
+      r.targetText = r.target
+        ? rangeText(a.low, a.high, r.dp) + ' ' + r.unit + (a.capped ? ' (max ' + r.target.maxPerDay + ' IU/day)' : '')
+        : 'None';
+      r.note = r.target && r.target.note ? r.target.note : '';
+    });
+
+    var nutrientRows = macro.slice(1, 3).concat(micro);
+    var dayVol = w * v.hmVol;
+    return {
+      std: std, stdKey: stdKey, inputs: v, macro: macro, micro: micro, nutrientRows: nutrientRows,
+      feeds: { day: dayVol, q2: dayVol / 12, q3: dayVol / 8 }
+    };
+  }
+
+  /* ---------- Rendering ---------- */
+
+  var STATUS_TEXT = { below: '▼ Below', within: '✓ Within', above: '▲ Above', info: 'For information' };
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function barHtml(r, hasValue) {
+    if (r.low === null || r.low === undefined) return '<div class="r-bar" aria-hidden="true"><div class="track"></div></div>';
+    var max = Math.max(r.high * 1.3, hasValue ? r.value * 1.08 : 0) || 1;
+    var pct = function (x) { return Math.max(0, Math.min(100, x / max * 100)); };
+    var lo = pct(r.low), hi = pct(r.high);
+    var html = '<div class="r-bar" aria-hidden="true"><div class="track">' +
+      '<span class="band" style="left:' + lo + '%;width:' + Math.max(hi - lo, 0.8) + '%"></span>';
+    if (hasValue) html += '<span class="mark" style="left:' + pct(r.value) + '%"></span>';
+    html += '</div><div class="scale"><span class="lo" style="left:' + lo + '%">' + fmt(r.low, r.dp) + '</span>' +
+      '<span class="hi" style="left:' + hi + '%">' + fmt(r.high, r.dp) + '</span></div></div>';
+    return html;
+  }
+
+  function rowHtml(r, hasValue) {
+    var status = hasValue ? r.status : 'none';
+    var pill = hasValue ? '<span class="pill ' + status + '">' + STATUS_TEXT[status] + '</span>' : '<span class="pill">Waiting for input</span>';
+    var gap = hasValue ? r.comment : (r.low !== null && r.low !== undefined ? 'Target ' + rangeText(r.low, r.high, r.dp) : 'No target in this edition');
+    var extra = hasValue && r.extra ? '<small>' + esc(r.extra) + '</small>' : '';
+    return '<li class="row ' + status + '">' +
+      '<div class="r-name"><span class="r-label">' + esc(r.label) + '</span><span class="r-unit">' + esc(r.unit) + '</span></div>' +
+      '<div class="r-value"><span class="num">' + (hasValue ? fmt(r.value, r.dp) : '—') + '</span>' + extra + '</div>' +
+      '<div class="r-status">' + pill + '<span class="r-gap">' + esc(gap) + '</span></div>' +
+      barHtml(r, hasValue) +
+      '<p class="r-note">' + esc(r.note || '') + '</p>' +
+      '</li>';
+  }
+
+  function render() {
+    var stdKey = document.querySelector('input[name="std"]:checked').value;
+    var read = readInputs();
+    var v = read.values;
+    // A neutral weight lets the empty state show the target ranges.
+    var result = calculate(read.ok ? v : Object.assign({}, v, { weight: v.weight > 0 && v.weight < 100 ? v.weight : 1 }), stdKey);
+    var has = read.ok;
+    lastResult = has ? result : null;
+
+    $('std-line').textContent = 'Compared with ' + result.std.label + ' recommendations for preterm infants';
+    $('rows-macro').innerHTML = result.macro.map(function (r) { return rowHtml(r, has); }).join('');
+    $('rows-micro').innerHTML = result.micro.map(function (r) { return rowHtml(r, has); }).join('');
+
+    // Notice and tally
+    var notice = '';
+    if (!has) {
+      if (read.missing.length) notice = 'Enter the ' + read.missing.join(' and ') + ' to see the results.';
+      else notice = 'Correct the highlighted boxes to see the results.';
+    }
+    $('notice').textContent = notice;
+    var tally = '';
+    if (has) {
+      var all = result.macro.concat(result.micro);
+      var count = { below: 0, within: 0, above: 0 };
+      all.forEach(function (r) { if (count[r.status] !== undefined) count[r.status]++; });
+      tally = ['below', 'within', 'above'].map(function (s) {
+        return '<span class="chip ' + s + '">' + count[s] + ' ' + s + '</span>';
+      }).join('');
+    }
+    $('tally').innerHTML = tally;
+    $('btn-pdf').disabled = !has;
+    $('btn-print').disabled = !has;
+
+    // Feed summary
+    var fs = $('feed-summary');
+    if (v.weight > 0 && v.weight <= 10 && v.hmVol > 0 && !document.querySelector('.field[data-key="hmVol"].is-error')) {
+      fs.innerHTML = 'Total milk <strong>' + fmt(result.feeds.day, 1) + ' ml/day</strong>: ' +
+        '<strong>' + fmt(result.feeds.q2, 1) + ' ml</strong> every 2 h or <strong>' + fmt(result.feeds.q3, 1) + ' ml</strong> every 3 h.';
+    } else {
+      fs.textContent = 'Feed volumes appear here once weight and milk volume are entered.';
+    }
+
+    renderContrib(result, has);
+  }
+
+  function renderContrib(result, has) {
+    var head = '<thead><tr><th scope="col">Nutrient</th>' +
+      SOURCES.map(function (s) { return '<th scope="col">' + esc(s.short) + '</th>'; }).join('') +
+      '<th scope="col">Total</th><th scope="col">Target</th></tr></thead>';
+    var body = result.nutrientRows.map(function (r) {
+      var cells = SOURCES.map(function (s) {
+        var x = r.parts[s.key];
+        if (!has) return '<td class="zero">—</td>';
+        return Math.abs(x) < 1e-9 ? '<td class="zero">–</td>' : '<td>' + fmt(x, r.dp) + '</td>';
+      }).join('');
+      var total = has ? '<td class="total ' + r.status + '">' + fmt(r.value, r.dp) + '</td>' : '<td class="total">—</td>';
+      var target = r.low !== null && r.low !== undefined ? rangeText(r.low, r.high, r.dp) : '–';
+      return '<tr><td>' + esc(r.label) + '<small>' + esc(r.unit) + '</small></td>' + cells + total + '<td>' + target + '</td></tr>';
+    }).join('');
+    $('contrib-table').innerHTML = head + '<tbody>' + body + '</tbody>';
+  }
+
+  function renderComposition() {
+    var head = '<thead><tr><th scope="col">Nutrient</th>' +
+      SOURCES.map(function (s) { return '<th scope="col">' + esc(s.short) + '<br><span style="font-weight:400">per ' + esc(s.per) + '</span></th>'; }).join('') +
+      '</tr></thead>';
+    var body = NUTRIENTS.map(function (n) {
+      return '<tr><td>' + esc(n.label) + '<small>' + esc(n.amount) + '</small></td>' +
+        SOURCES.map(function (s) {
+          var x = n.comp[s.key] || 0;
+          return x ? '<td>' + x + '</td>' : '<td class="zero">–</td>';
+        }).join('') + '</tr>';
+    }).join('');
+    $('comp-table').innerHTML = head + '<tbody>' + body + '</tbody>';
+
+    SOURCES.forEach(function (s) {
+      var hint = $(s.key === 'hm' ? 'hmVol-hint' : s.key + '-hint');
+      if (hint) hint.textContent = 'Per ' + s.per + ': ' + compText(s) + '.';
+    });
+  }
+
+  /* ---------- PDF ---------- */
+
+  function pdfSafe(s) {
+    return String(s)
+      .replace(/µ/g, 'mc').replace(/[–—−]/g, '-')
+      .replace(/▼|▲|✓/g, '').trim();
+  }
+
+  function slug(s) { return String(s).trim().replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40); }
+
+  var PDF_COLORS = {
+    below: { fill: [226, 238, 250], text: [26, 100, 166] },
+    within: { fill: [222, 242, 229], text: [31, 122, 69] },
+    above: { fill: [251, 229, 226], text: [184, 53, 42] }
+  };
+
+  function downloadPdf() {
+    var r = lastResult;
+    if (!r) return;
+    var lib = window.jspdf;
+    if (!lib || !lib.jsPDF) {
+      toast('The PDF tool could not load. Use Print and choose "Save as PDF" instead.');
+      return;
+    }
+    var doc = new lib.jsPDF({ unit: 'mm', format: 'a4' });
+    if (typeof doc.autoTable !== 'function') {
+      toast('The PDF tool could not load. Use Print and choose "Save as PDF" instead.');
+      return;
+    }
+    var W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 14;
+    var INK = [22, 32, 42], MUTED = [95, 107, 120], LINE = [205, 212, 220], HEAD = [236, 239, 243];
+    var v = r.inputs;
+    var mother = $('mother').value.trim(), cr = $('cr').value.trim();
+    var dateIso = $('date').value || todayISO();
+    var now = new Date();
+    var stamp = dateLabel(todayISO()) + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+    // Header band
+    doc.setFillColor(INK[0], INK[1], INK[2]);
+    doc.rect(0, 0, W, 22, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+    doc.text('Enteral Nutrient Calculation', M, 10.5);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+    doc.text('Daily intake compared with ' + r.std.label + ' recommendations for preterm infants', M, 16.5);
+    doc.text(dateLabel(dateIso), W - M, 10.5, { align: 'right' });
+
+    var y = 27;
+    function heading(text) {
+      if (y > H - 40) { doc.addPage(); y = 18; }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(INK[0], INK[1], INK[2]);
+      doc.text(text, M, y);
+      y += 2;
+    }
+    var gridStyles = {
+      theme: 'grid', margin: { left: M, right: M },
+      styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 1.6, textColor: INK, lineColor: LINE, lineWidth: 0.2 },
+      headStyles: { fillColor: HEAD, textColor: INK, fontStyle: 'bold' }
+    };
+    function table(opts) {
+      doc.autoTable(Object.assign({}, gridStyles, { startY: y }, opts));
+      y = doc.lastAutoTable.finalY + 7;
+    }
+
+    // Patient
+    doc.autoTable({
+      startY: y, theme: 'plain', margin: { left: M, right: M },
+      styles: { font: 'helvetica', fontSize: 9.5, cellPadding: { top: 1, bottom: 1, left: 0, right: 3 }, textColor: INK },
+      columnStyles: { 0: { textColor: MUTED, cellWidth: 30 }, 1: { fontStyle: 'bold' }, 2: { textColor: MUTED, cellWidth: 30 }, 3: { fontStyle: 'bold' } },
+      body: [
+        ["Mother's name", pdfSafe(mother) || '-', 'Baby CR number', pdfSafe(cr) || '-'],
+        ['Weight', plain(v.weight) + ' kg', 'Date', dateLabel(dateIso)]
+      ]
+    });
+    y = doc.lastAutoTable.finalY + 6;
+
+    // Feeds and supplements
+    heading('Feeds and supplements');
+    var feedRows = [[
+      'Human milk', plain(v.hmVol) + ' ml/kg/day',
+      fmt(r.feeds.day, 1) + ' ml/day: ' + fmt(r.feeds.q2, 1) + ' ml every 2 h or ' + fmt(r.feeds.q3, 1) + ' ml every 3 h'
+    ]];
+    var units = { hmf: 'g/day', mct: 'ml/day', mvi: 'ml/day', vitd: 'ml/day', iron: 'drops/day', calph: 'ml/day' };
+    SUPPLEMENTS.forEach(function (key) {
+      var s = SOURCES.filter(function (x) { return x.key === key; })[0];
+      feedRows.push([s.label, v[key] ? plain(v[key]) + ' ' + units[key] : 'Not given', pdfSafe('Per ' + s.per + ': ' + compText(s))]);
+    });
+    table({
+      head: [['Item', 'Prescribed', 'Detail']], body: feedRows,
+      columnStyles: { 0: { cellWidth: 46 }, 1: { cellWidth: 32 }, 2: { textColor: MUTED } }
+    });
+
+    // Results
+    heading('Nutrient intake');
+    var all = r.macro.concat(r.micro);
+    table({
+      head: [['Nutrient', 'Intake', 'Unit', 'Target (' + r.std.label + ')', 'Status', 'Comment']],
+      body: all.map(function (row) {
+        return [
+          row.label, fmt(row.value, row.dp) + (row.extra ? '\n(' + row.extra + ')' : ''), pdfSafe(row.unit),
+          pdfSafe(row.targetText), pdfSafe(STATUS_TEXT[row.status]), pdfSafe(row.comment)
+        ];
+      }),
+      columnStyles: {
+        0: { cellWidth: 36, fontStyle: 'bold' }, 1: { halign: 'right', cellWidth: 24, fontStyle: 'bold' },
+        2: { cellWidth: 26 }, 4: { cellWidth: 18, fontStyle: 'bold', halign: 'center' }
+      },
+      didParseCell: function (data) {
+        if (data.section !== 'body') return;
+        var c = PDF_COLORS[all[data.row.index].status];
+        if (!c) return;
+        if (data.column.index === 4) { data.cell.styles.fillColor = c.fill; data.cell.styles.textColor = c.text; }
+        if (data.column.index === 1) { data.cell.styles.textColor = c.text; }
+      }
+    });
+
+    // Contribution by source
+    heading('Contribution by source');
+    var nr = r.nutrientRows;
+    table({
+      head: [['Nutrient'].concat(SOURCES.map(function (s) { return s.short; }), ['Total'])],
+      body: nr.map(function (row) {
+        return [row.label + ' (' + pdfSafe(row.unit) + ')'].concat(
+          SOURCES.map(function (s) { var x = row.parts[s.key]; return Math.abs(x) < 1e-9 ? '-' : fmt(x, row.dp); }),
+          [fmt(row.value, row.dp)]
+        );
+      }),
+      styles: Object.assign({}, gridStyles.styles, { fontSize: 8, halign: 'right' }),
+      columnStyles: { 0: { halign: 'left', cellWidth: 46 } },
+      didParseCell: function (data) {
+        if (data.section === 'head' && data.column.index > 0) data.cell.styles.halign = 'right';
+        if (data.section !== 'body' || data.column.index !== SOURCES.length + 1) return;
+        var c = PDF_COLORS[nr[data.row.index].status];
+        if (c) { data.cell.styles.fillColor = c.fill; data.cell.styles.textColor = c.text; data.cell.styles.fontStyle = 'bold'; }
+      }
+    });
+
+    // Notes
+    var notes = [
+      'Fortifier and supplements are total amounts per day. Results are per kg per day unless the unit says otherwise.',
+      'Composition values are those set in the calculator (human milk ' + NUT.energy.comp.hm + ' kcal and ' + NUT.protein.comp.hm +
+        ' g protein per 100 ml). Status is judged on the rounded values shown.',
+      'Reference: ' + r.std.cite + '.',
+      'Calculation aid only. Check the figures and the unit protocol before prescribing.'
+    ];
+    if (y > H - 34) { doc.addPage(); y = 18; }
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+    notes.forEach(function (line) {
+      var wrapped = doc.splitTextToSize(line, W - 2 * M);
+      doc.text(wrapped, M, y);
+      y += wrapped.length * 3.6 + 1;
+    });
+
+    // Footer on every page
+    var pages = doc.getNumberOfPages();
+    for (var i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(7.5); doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+      doc.text('Generated ' + stamp + ' with the Enteral Nutrient Calculator', M, H - 8);
+      doc.text('Page ' + i + ' of ' + pages, W - M, H - 8, { align: 'right' });
+    }
+
+    doc.save('enteral-nutrition_' + (slug(cr) || 'patient') + '_' + dateIso + '.pdf');
+  }
+
+  /* ---------- UI wiring ---------- */
+
+  var toastTimer;
+  function toast(text) {
+    var t = $('toast');
+    t.textContent = text;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, 5000);
+  }
+
+  var clearTimer;
+  function clearAll() {
+    var btn = $('btn-clear');
+    if (!btn.classList.contains('confirming')) {
+      btn.classList.add('confirming');
+      btn.textContent = 'Click again to clear';
+      clearTimer = setTimeout(function () { btn.classList.remove('confirming'); btn.textContent = 'Clear all'; }, 3000);
+      return;
+    }
+    clearTimeout(clearTimer);
+    btn.classList.remove('confirming');
+    btn.textContent = 'Clear all';
+    ['mother', 'cr'].concat(INPUT_KEYS).forEach(function (id) { $(id).value = ''; });
+    $('date').value = todayISO();
+    render();
+    $('weight').focus();
+  }
+
+  function loadExample() {
+    INPUT_KEYS.forEach(function (key) { $(key).value = EXAMPLE[key]; });
+    render();
+  }
+
+  $('date').value = todayISO();
+  renderComposition();
+  render();
+
+  $('calc').addEventListener('input', render);
+  $('calc').addEventListener('submit', function (e) { e.preventDefault(); });
+  document.querySelectorAll('input[name="std"]').forEach(function (el) { el.addEventListener('change', render); });
+  $('btn-example').addEventListener('click', loadExample);
+  $('btn-clear').addEventListener('click', clearAll);
+  $('btn-pdf').addEventListener('click', downloadPdf);
+  $('btn-print').addEventListener('click', function () { window.print(); });
+
+  // Expand the tables while printing, then restore.
+  var openState = [];
+  window.addEventListener('beforeprint', function () {
+    openState = Array.prototype.map.call(document.querySelectorAll('details'), function (d) { var o = d.open; d.open = true; return o; });
+  });
+  window.addEventListener('afterprint', function () {
+    document.querySelectorAll('details').forEach(function (d, i) { if (openState.length) d.open = openState[i]; });
+  });
+
+  // Exposed for testing in the browser console.
+  window.EnteralCalc = { calculate: calculate, STANDARDS: STANDARDS, NUTRIENTS: NUTRIENTS, SOURCES: SOURCES };
+})();
+</script>
+</body>
+</html>
